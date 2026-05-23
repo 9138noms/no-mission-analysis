@@ -13,7 +13,7 @@ No strategy commentary, no exploit notes. Just the raw structure for anyone stud
 ## How the analysis was produced
 
 1. Built-in missions are not loose `.json` files on disk — they are packed into Unity `resources.assets` as `TextAsset`s, loaded at runtime via `Resources.LoadAll<TextAsset>("Missions")` (see [`MissionGroup.cs`](https://github.com/) in the decompiled `Assembly-CSharp`).
-2. A small BepInEx plugin ([NOMissionDumper](https://github.com/9138noms)) dumps every `TextAsset` as-is to disk — byte-exact, no `JsonUtility.ToJson` round-trip and no auto version upgrade. This matters because **saving via the mission editor re-serializes through `JsonUtility` and applies `MissionVersionUpgrade.Upgrade()` on load**, so editor-copied files differ from the original in field order, float precision, and sometimes structure.
+2. A small BepInEx plugin ([NOMissionDumper](https://github.com/9138noms/NOMissionDumper)) dumps every `TextAsset` as-is to disk — byte-exact, no `JsonUtility.ToJson` round-trip and no auto version upgrade. This matters because **saving via the mission editor re-serializes through `JsonUtility` and applies `MissionVersionUpgrade.Upgrade()` on load**, so editor-copied files differ from the original in field order, float precision, and sometimes structure. Download the prebuilt dll from the [releases page](https://github.com/9138noms/NOMissionDumper/releases).
 3. Trigger/outcome graphs are extracted directly from the dumped JSON's `objectives.Objectives` and `objectives.Outcomes` lists.
 
 ## Key notes about the trigger format
