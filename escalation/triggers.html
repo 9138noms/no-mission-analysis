@@ -1,0 +1,671 @@
+<!-- NOCS Escalation Trigger Chain — interactive diagram. Self-contained, offline. -->
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>NOCS · Escalation Trigger Chain</title>
+<style>
+  :root{
+    --bg:#0b0f14; --panel:#11171f; --panel2:#0e1319; --line:#1d2733;
+    --ink:#dfe7ef; --ink-dim:#8a97a6; --accent:#5ad1c8;
+    --c-objective:#4a90e2; --c-capture:#f5a623; --c-hidden:#8a93a0;
+    --c-wait:#8a93a0; --c-spawn:#7ed321; --c-message:#f8e71c;
+    --c-stop:#9013fe; --c-victory:#d0021b; --c-andgate:#bd10e0; --c-start:#e6edf3;
+    --mono:ui-monospace,"Cascadia Code","JetBrains Mono","SFMono-Regular",Menlo,Consolas,monospace;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family:var(--mono)}
+  body{display:flex;flex-direction:column;overflow:hidden}
+
+  /* atmospheric grid backdrop */
+  .stage-bg{position:absolute;inset:0;
+    background-image:
+      linear-gradient(var(--line) 1px,transparent 1px),
+      linear-gradient(90deg,var(--line) 1px,transparent 1px);
+    background-size:42px 42px;opacity:.18;pointer-events:none}
+
+  header{flex:0 0 auto;border-bottom:1px solid var(--line);background:linear-gradient(180deg,#0e141b,#0b0f14);
+    padding:10px 14px;display:flex;flex-wrap:wrap;align-items:center;gap:10px 16px;z-index:5}
+  .brand{display:flex;flex-direction:column;line-height:1.05;margin-right:6px}
+  .brand b{font-size:14px;letter-spacing:.18em;text-transform:uppercase}
+  .brand span{font-size:10px;color:var(--ink-dim);letter-spacing:.22em;text-transform:uppercase}
+
+  .seg{display:flex;border:1px solid var(--line);border-radius:7px;overflow:hidden}
+  .seg button{background:transparent;color:var(--ink-dim);border:0;padding:7px 14px;font-family:var(--mono);
+    font-size:11px;letter-spacing:.14em;text-transform:uppercase;cursor:pointer;transition:.15s}
+  .seg button+button{border-left:1px solid var(--line)}
+  .seg button:hover{color:var(--ink)}
+  .seg button.on{background:var(--accent);color:#06100f;font-weight:700}
+
+  .lbl{font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:var(--ink-dim);margin-right:-8px}
+  .ghost{background:transparent;color:var(--ink);border:1px solid var(--line);border-radius:7px;
+    padding:7px 13px;font-family:var(--mono);font-size:11px;letter-spacing:.12em;text-transform:uppercase;cursor:pointer}
+  .ghost:hover{border-color:var(--accent);color:var(--accent)}
+  .spacer{flex:1 1 auto}
+
+  main{flex:1 1 auto;position:relative;overflow:hidden}
+  svg#stage{position:absolute;inset:0;width:100%;height:100%;cursor:grab;touch-action:none}
+  svg#stage.grabbing{cursor:grabbing}
+  svg#stage text{font-family:var(--mono)}
+
+  /* legend */
+  .legend{position:absolute;left:12px;bottom:12px;background:rgba(13,18,25,.92);border:1px solid var(--line);
+    border-radius:9px;padding:10px 12px;font-size:10.5px;z-index:4;max-width:230px;backdrop-filter:blur(4px)}
+  .legend h4{margin:0 0 7px;font-size:9.5px;letter-spacing:.2em;text-transform:uppercase;color:var(--ink-dim)}
+  .legend .row{display:flex;align-items:center;gap:7px;margin:3px 0;color:var(--ink)}
+  .legend .sw{width:13px;height:13px;border-radius:3px;flex:0 0 auto}
+  .legend .note{margin-top:8px;color:var(--ink-dim);font-size:9.5px;line-height:1.45;border-top:1px solid var(--line);padding-top:7px}
+
+  /* side panel */
+  .panel{position:absolute;top:0;right:0;height:100%;width:330px;max-width:84vw;background:var(--panel);
+    border-left:1px solid var(--line);transform:translateX(102%);transition:transform .22s ease;z-index:6;
+    display:flex;flex-direction:column}
+  .panel.open{transform:translateX(0)}
+  .panel .ph{padding:14px 16px;border-bottom:1px solid var(--line);display:flex;align-items:flex-start;gap:10px}
+  .panel .ph .x{margin-left:auto;background:transparent;border:0;color:var(--ink-dim);font-size:20px;cursor:pointer;line-height:1}
+  .panel .ph .x:hover{color:var(--ink)}
+  .ptag{display:inline-block;font-size:9px;letter-spacing:.16em;text-transform:uppercase;padding:3px 8px;border-radius:20px;
+    border:1px solid currentColor;margin-bottom:7px}
+  .panel h3{margin:0;font-size:15px;line-height:1.25}
+  .pbody{padding:14px 16px;overflow:auto;font-size:12.5px;line-height:1.55;color:var(--ink)}
+  .pbody .k{color:var(--ink-dim);font-size:10px;letter-spacing:.16em;text-transform:uppercase;margin:14px 0 5px}
+  .pbody .k:first-child{margin-top:0}
+  .pbody ul{margin:4px 0;padding-left:18px}
+  .pbody li{margin:2px 0}
+  .pbody code{background:var(--panel2);border:1px solid var(--line);border-radius:4px;padding:1px 5px;font-size:11px}
+  .chip{display:inline-block;background:var(--panel2);border:1px solid var(--line);border-radius:5px;padding:2px 8px;margin:2px 4px 2px 0;font-size:11px}
+
+  .hint{position:absolute;top:12px;left:50%;transform:translateX(-50%);background:rgba(13,18,25,.9);
+    border:1px solid var(--line);border-radius:20px;padding:6px 14px;font-size:10.5px;color:var(--ink-dim);
+    letter-spacing:.06em;z-index:4;transition:opacity .4s}
+  .badge{font-family:var(--mono)}
+</style>
+
+<header>
+  <div class="brand"><b>Escalation · Trigger Chain</b><span>Nuclear Option — NOCS reference</span></div>
+
+  <div class="seg" id="tabs">
+    <button data-tab="full" class="on">Full</button>
+    <button data-tab="simple">Simplified</button>
+  </div>
+
+  <span class="lbl" id="lbl-faction">Faction</span>
+  <div class="seg" id="filter">
+    <button data-side="all" class="on">Both</button>
+    <button data-side="PALA">PALA</button>
+    <button data-side="BDF">BDF</button>
+  </div>
+
+  <span class="lbl" id="lbl-lang">Lang</span>
+  <div class="seg" id="lang">
+    <button data-lang="en" class="on">EN</button>
+    <button data-lang="ko">한</button>
+  </div>
+
+  <button class="ghost" id="fit">Fit</button>
+  <button class="ghost" id="reset">Reset layout</button>
+  <span class="spacer"></span>
+  <span class="lbl" id="counter"></span>
+</header>
+
+<main>
+  <div class="stage-bg"></div>
+  <svg id="stage"></svg>
+  <div class="hint" id="hint">Drag nodes · scroll to zoom · drag empty space to pan · click a node for detail</div>
+
+  <div class="legend">
+    <h4 id="lg-title">Node types</h4>
+    <div class="row"><span class="sw" style="background:var(--c-objective)"></span><span class="lt">Visible objective</span></div>
+    <div class="row"><span class="sw" style="background:var(--c-capture)"></span><span class="lt">Capture option</span></div>
+    <div class="row"><span class="sw" style="background:var(--c-hidden)"></span><span class="lt">Hidden watcher</span></div>
+    <div class="row"><span class="sw" style="background:var(--c-wait);border:1.5px dashed #cdd5df"></span><span class="lt">Wait / delay</span></div>
+    <div class="row"><span class="sw" style="background:var(--c-spawn)"></span><span class="lt">Spawn event</span></div>
+    <div class="row"><span class="sw" style="background:var(--c-message)"></span><span class="lt">Message</span></div>
+    <div class="row"><span class="sw" style="background:var(--c-stop)"></span><span class="lt">Stop / interrupt</span></div>
+    <div class="row"><span class="sw" style="background:var(--c-andgate)"></span><span class="lt">AND gate</span></div>
+    <div class="row"><span class="sw" style="background:var(--c-victory)"></span><span class="lt">Victory / end</span></div>
+    <div class="note" id="lg-note">Faction = which side's win this node serves (offense) or whose territory it defends. Neutral (carrier / HVT) shows in all views.</div>
+  </div>
+
+  <aside class="panel" id="panel">
+    <div class="ph">
+      <div>
+        <span class="ptag" id="p-tag">—</span>
+        <h3 id="p-title">—</h3>
+      </div>
+      <button class="x" id="p-close">×</button>
+    </div>
+    <div class="pbody" id="p-body"></div>
+  </aside>
+</main>
+
+<script>
+"use strict";
+const COLORS={objective:'#4a90e2',capture:'#f5a623',hidden:'#8a93a0',wait:'#8a93a0',
+  spawn:'#7ed321',message:'#f8e71c',stop:'#9013fe',victory:'#d0021b',andgate:'#bd10e0',start:'#e6edf3'};
+const TYPENAME={objective:'Visible objective',capture:'Capture option',hidden:'Hidden watcher',
+  wait:'Wait / delay',spawn:'Spawn event',message:'Message',stop:'Stop / interrupt',
+  victory:'Victory / end',andgate:'AND gate',start:'Mission start'};
+
+/* ---- Korean dictionaries ---- */
+const TYPENAME_KO={objective:'가시 오브젝티브',capture:'점령 옵션',hidden:'숨겨진 감시기',
+  wait:'대기 / 지연',spawn:'스폰 이벤트',message:'메시지',stop:'차단 / 중단',
+  victory:'승리 / 종료',andgate:'AND 게이트',start:'미션 시작'};
+const SYSKO={'Start':'시작','BDF offensive cascade':'BDF 공격 캐스케이드','PALA offensive cascade':'PALA 공격 캐스케이드',
+  'Threat → Reinforcement':'위협 → 증원','Depot → Stop':'데포 → 차단','Carrier':'항모',
+  'Victory · PALA':'승리 · PALA','Victory · BDF':'승리 · BDF','Offense':'공격','Reinforcement':'증원',
+  'Win req':'승리 조건','Victory':'승리'};
+const TERRKO={City:'도시',North:'북부',Desert:'사막',Mountain:'산악'};
+const DIRKO={East:'동부',West:'서부'};
+const GEN_CAS_KO='BDF가 이 PALA 표적을 파괴 → 체인의 다음 오브젝티브 시작.';
+const KO={
+ start:{l:'미션 시작',d:'SetStartingConditions — 미션 로드 즉시 23개 오브젝트 동시 활성화: 가시 오브젝티브, 양측 승리 AND 게이트, 모든 숨겨진 감시기(위협/데포/HVT/항모격침/전체시설).'},
+ bd_hwy1:{l:'PALA HWY1 파괴',b:'진입 ×1',d:GEN_CAS_KO},
+ bd_lvf1:{l:'PALA LVFac1 파괴',d:GEN_CAS_KO},
+ bd_abdesert:{l:'PALA 사막 비행장 파괴',d:GEN_CAS_KO},
+ bd_lvf2:{l:'PALA LVFac2 파괴',d:GEN_CAS_KO},
+ bd_airfacrear:{l:'PALA 후방 항공공장 파괴',b:'분기',d:GEN_CAS_KO},
+ bd_supportfac:{l:'PALA 지원공장 파괴',d:GEN_CAS_KO},
+ bd_tankfac:{l:'PALA 전차공장 파괴',d:GEN_CAS_KO},
+ bd_abmtn:{l:'PALA 산악 비행장 파괴',d:GEN_CAS_KO},
+ bd_airfacmtn:{l:'PALA 산악 항공공장 파괴',d:GEN_CAS_KO},
+ bd_airfacisland:{l:'PALA 도서 항공공장 파괴',d:GEN_CAS_KO},
+ bd_abisland:{l:'PALA 도서 비행장 파괴',b:'라인 끝',d:GEN_CAS_KO},
+ bd_enrich:{l:'PALA 농축시설 파괴',d:'후방 항공공장에서 갈라지는 분기(Start_Destroy_PALA_Enrichment 경유).'},
+ bd_capfarm:{l:'점령: The Farm',d:'Start_Destroy_PALA_SupportFac와 동시 발동. 점령 시 아군 전선 비행장으로 전환. 하위 트리거 없음.'},
+ bd_capsouthep:{l:'점령: 남부 농축시설',d:'Start_Destroy_PALA_Enrichment와 동시 발동. 점령 전용, 체인 영향 없음.'},
+ pd_south:{l:'BDF 남부 파괴',b:'진입 ×2',d:'PALA 진입점 2개 중 하나.'},
+ pd_hwy2:{l:'BDF HWY2 파괴',b:'진입 ×2',d:'두 번째 PALA 진입점. Maris 점령 옵션도 동시 시작.'},
+ pd_lvf1:{l:'BDF LVFac1 파괴'},
+ pd_lvf2:{l:'BDF LVFac2 파괴'},
+ pd_airfac1:{l:'BDF 항공공장1 파괴'},
+ pd_airfac2:{l:'BDF 항공공장2 파괴'},
+ pd_abnorth:{l:'BDF 북부 비행장 파괴',b:'분기'},
+ pd_abcity:{l:'BDF 도시 비행장 파괴',b:'분기 · 순환'},
+ pd_supportfac:{l:'BDF 지원공장 파괴',b:'순환',d:'SupportFac ↔ TankFac ↔ AirbaseCity 순환 의존성의 일부: 하나를 부수면 나머지가 재활성화됨. AirFac1도 다시 열림.'},
+ pd_tankfac:{l:'BDF 전차공장 파괴',b:'순환',d:'SupportFac ↔ TankFac ↔ AirbaseCity 순환의 일부.'},
+ pd_enrich:{l:'BDF 농축시설 파괴'},
+ pd_capmaris:{l:'점령: Maris 헬리포트',d:'Start_Destroy_BDF_LVFac2(HWY2발)와 동시 발동. 점령 전용.'},
+ pd_capnorthep:{l:'점령: 북부 농축시설',d:'BDF 농축시설 시작(북부/도시 비행장발)과 동시 발동. 점령 전용.'},
+ hvt:{l:'HVT ≥50% 손상 (70+ 중 1개)',b:'트리거',d:'공유 트리거 1개. 고가치 빌딩(CityFac/NorthFac/MtnFac/RearFac/IslandFac/공장/RearDepot/농축시설) 중 아무거나 처음 50% 도달 시 항모 카운트다운 시작.'},
+ nv_delay:{l:'50초 대기 · 해상 메시지 지연'},
+ nv_msg:{l:'메시지: 해상 증원 · 도착 10분'},
+ nv_send:{l:'600초 대기 (10분)'},
+ nv_spawn:{l:'함대 스폰 · 양측 항모 + 호위함 4척',b:'양측',d:'BDF_Carrier + PALA_Carrier + 호위함 4척 동시 스폰. HVT 손상부터 총 50+600=650초(~10분50초).'},
+ nv_spawnmsg:{l:'메시지: 함대 도착'},
+ p_allfac:{l:'BDF 핵심 시설 전체 파괴',b:'승리조건',d:'CityFac1–9 + NorthFac1–9 전부 파괴 필요(PALA 공격 캐스케이드 전반에 분산). 완료 시 BDF 항모 격침 활성화.'},
+ p_startsink:{l:'BDF 항모 격침 시작'},
+ p_sink:{l:'BDF 항모 격침',d:'BDF 시설 전부 제거 후에야 승리 입력으로 완료 가능(항모는 그 전에도 타격 가능하나, 게이트는 이 오브젝티브가 complete여야 함).'},
+ p_sinknotif:{l:'BDF 항모 격침 (알림)'},
+ p_sunkmsg:{l:'메시지: BDF 함대 항모 격침됨'},
+ p_and:{l:'PALA 승리 조건',b:'AND',d:"AND 게이트. 'BDF 시설 전체 파괴'와 'BDF 항모 격침' 둘 다 완료 시에만 발동."},
+ p_victory:{l:'PALA 승리 · 게임 종료'},
+ p_vicmsg:{l:'메시지: 적이 항복했다 — 승리!'},
+ b_allfac:{l:'PALA 핵심 시설 전체 파괴',b:'승리조건',d:'IslandFac1–3 + MtnFac1–8 + RearFac1–6 전부 파괴 필요. 완료 시 PALA 항모 격침 활성화.'},
+ b_startsink:{l:'PALA 항모 격침 시작'},
+ b_sink:{l:'PALA 항모 격침',d:'PALA 시설 전부 제거 후 승리 입력으로 완료 가능.'},
+ b_sinknotif:{l:'PALA 항모 격침 (알림)'},
+ b_sunkmsg:{l:'메시지: PALA 함대 항모 격침됨'},
+ b_and:{l:'BDF 승리 조건',b:'AND',d:"AND 게이트. 'PALA 시설 전체 파괴'와 'PALA 항모 격침' 둘 다 완료 시에만 발동."},
+ b_victory:{l:'BDF 승리 · 게임 종료'},
+ b_vicmsg:{l:'메시지: 적이 항복했다 — 승리!'},
+ s_start:{l:'미션 시작',d:'23개 오브젝트 동시 활성화: 가시 오브젝티브, 양측 승리 게이트, 모든 숨겨진 감시기.'},
+ s_bdf:{l:'BDF → PALA 박멸 체인 · 12 오브젝티브',b:'진입 ×1',d:'HWY1에서 PALA 비행장/공장으로 이어지는 선형 캐스케이드. 진입점 1개(HWY1).'},
+ s_pala:{l:'PALA → BDF 박멸 체인 · 11 오브젝티브',b:'진입 ×2 · 순환',d:'진입점 2개(South + HWY2). SupportFac ↔ TankFac ↔ AirbaseCity 순환 의존성 포함.'},
+ s_reinf:{l:'위협 감지 ×8 → 증원',d:'영토 감시기 8개(BDF 도시/북부, PALA 사막/산악). 각각: 빌딩 ≥50% 손상 → 15분 타이머 → 15기 호송대.'},
+ s_depot:{l:'후방 데포 파괴 → 증원 차단 ×4',d:'한 영토의 후방 데포 2개를 모두 부수면 그 영토 호송대 타이머가 영구 취소됨.'},
+ s_hvt:{l:'HVT 50% 손상 → 항모 카운트다운',b:'트리거',d:'공유 트리거 1개(70+ 빌딩 대상). 해상 증원 타임라인 시작.'},
+ s_allfac_b:{l:'BDF 시설 전체 파괴',b:'승리조건'},
+ s_allfac_p:{l:'PALA 시설 전체 파괴',b:'승리조건'},
+ s_convoy:{l:'호송대 스폰 (15기) ×8',d:'맵 컨트롤용 증원 — 직접 승리 조건 아님.'},
+ s_carrier:{l:'양측 항모 + 호위함 4척 스폰 (~10분50초)',b:'양측'},
+ s_sink_b:{l:'BDF 항모 격침'},
+ s_sink_p:{l:'PALA 항모 격침'},
+ s_pala_and:{l:'PALA 승리 (AND)',b:'AND',d:'BDF 시설 전체 파괴 AND BDF 항모 격침.'},
+ s_bdf_and:{l:'BDF 승리 (AND)',b:'AND',d:'PALA 시설 전체 파괴 AND PALA 항모 격침.'},
+ s_end:{l:'게임 종료',d:'제한 시간(NOCS V 기준 1시간 30분) 내 어느 쪽도 완전 승리 조건을 못 채우면 점수 높은 팀이 승리.'}
+};
+
+/* ---------- FULL GRAPH ---------- */
+const F_nodes=[];
+const F_edges=[];
+function N(o){F_nodes.push(o);}                       // node
+function E(s,t,k){F_edges.push({s,t,k:k||'normal'});} // edge
+
+// --- Mission start ---
+N({id:'start',label:'MISSION START',type:'start',side:'neutral',sys:'Start',x:60,y:560,
+   detail:'SetStartingConditions — 23 objects activate at the same instant on mission load: the visible objectives, both victory AND-gates, all hidden watchers (threat, depot, HVT, carrier-sink, all-facilities).'});
+
+// --- BDF offensive cascade (BDF destroys PALA assets) ---  side BDF, row y~120
+const bcas=[
+ ['bd_hwy1','Destroy PALA HWY1','HWY1: hwy1_SPAAG1_1 + 6 vehicles','ENTRY ×1'],
+ ['bd_lvf1','Destroy PALA LVFac1','palalvf1_factory_* (4)'],
+ ['bd_abdesert','Destroy PALA Airbase Desert','Dsrt_VehicleDepot, Dsrt_pillbox, … (7)'],
+ ['bd_lvf2','Destroy PALA LVFac2','palalvf2_factory_* (4)'],
+ ['bd_airfacrear','Destroy PALA AirFac Rear','RearFac1–6','BRANCH'],
+ ['bd_supportfac','Destroy PALA SupportFac','factory_large_24/29/30, factory_tall, factory_tall_1'],
+ ['bd_tankfac','Destroy PALA TankFac','factory_large_11/12/13'],
+ ['bd_abmtn','Destroy PALA Airbase Mtn','Mtn_HLT-M_11, factory_tall_3/4, MtnFac1/2'],
+ ['bd_airfacmtn','Destroy PALA AirFac Mtn','MtnFac4–8'],
+ ['bd_airfacisland','Destroy PALA AirFac Island','IslandFac1–3'],
+ ['bd_abisland','Destroy PALA Airbase Island','R9Isle_HLT, SPAAG, Linebreaker, …','LINE END'],
+];
+bcas.forEach((b,i)=>N({id:b[0],label:b[1],type:'objective',side:'BDF',sys:'BDF offensive cascade',
+   x:300+i*250,y:120,buildings:b[2],badge:b[3],detail:'BDF destroys this PALA target; completion starts the next objective in the chain.'}));
+// chain edges
+E('start','bd_hwy1'); E('bd_hwy1','bd_lvf1'); E('bd_lvf1','bd_abdesert'); E('bd_abdesert','bd_lvf2');
+E('bd_lvf2','bd_airfacrear'); E('bd_airfacrear','bd_supportfac'); E('bd_supportfac','bd_tankfac');
+E('bd_tankfac','bd_abmtn'); E('bd_abmtn','bd_airfacmtn'); E('bd_airfacmtn','bd_airfacisland'); E('bd_airfacisland','bd_abisland');
+// branch: enrichment + captures off AirFacRear
+N({id:'bd_enrich',label:'Destroy PALA Enrichment',type:'objective',side:'BDF',sys:'BDF offensive cascade',x:1300,y:-20,
+   detail:'Side branch from AirFac Rear (via Start_Destroy_PALA_Enrichment).'});
+N({id:'bd_capfarm',label:'Capture: The Farm',type:'capture',side:'BDF',sys:'BDF offensive cascade',x:1430,y:300,
+   detail:'Co-triggered with Start_Destroy_PALA_SupportFac. On capture, flips to a friendly forward airfield. No downstream outcome.'});
+N({id:'bd_capsouthep',label:'Capture: Enrichment Plant South',type:'capture',side:'BDF',sys:'BDF offensive cascade',x:1150,y:300,
+   detail:'Co-triggered with Start_Destroy_PALA_Enrichment. Capture-only, no chain outcome.'});
+E('bd_airfacrear','bd_enrich');
+E('bd_airfacrear','bd_capfarm','capture'); E('bd_airfacrear','bd_capsouthep','capture');
+
+// --- PALA offensive cascade (PALA destroys BDF assets) --- side PALA, rows y~420/560 (two entries)
+N({id:'pd_south',label:'Destroy BDF South',type:'objective',side:'PALA',sys:'PALA offensive cascade',x:300,y:430,
+   buildings:'SB_SPAAG1, pillbox_6, VehicleDepot1, HLT-FT_6, … (8)',badge:'ENTRY ×2',detail:'One of two PALA entry points.'});
+N({id:'pd_hwy2',label:'Destroy BDF HWY2',type:'objective',side:'PALA',sys:'PALA offensive cascade',x:300,y:600,
+   buildings:'hwy2_SPAAG1_2 + 5 vehicles',badge:'ENTRY ×2',detail:'Second PALA entry point. Also co-starts the Maris capture option.'});
+N({id:'pd_lvf1',label:'Destroy BDF LVFac1',type:'objective',side:'PALA',sys:'PALA offensive cascade',x:560,y:430,buildings:'bdflvf1_factory_* (4)'});
+N({id:'pd_lvf2',label:'Destroy BDF LVFac2',type:'objective',side:'PALA',sys:'PALA offensive cascade',x:560,y:600,buildings:'bdflvf2_factory_* (4)'});
+N({id:'pd_airfac1',label:'Destroy BDF AirFac1',type:'objective',side:'PALA',sys:'PALA offensive cascade',x:820,y:430,buildings:'NorthFac5–10'});
+N({id:'pd_airfac2',label:'Destroy BDF AirFac2',type:'objective',side:'PALA',sys:'PALA offensive cascade',x:820,y:600,buildings:'CityFac1/2/4/5/9'});
+N({id:'pd_abnorth',label:'Destroy BDF Airbase North',type:'objective',side:'PALA',sys:'PALA offensive cascade',x:1090,y:430,buildings:'North_RearDepot1/2, NorthFac1–4',badge:'BRANCH'});
+N({id:'pd_abcity',label:'Destroy BDF Airbase City',type:'objective',side:'PALA',sys:'PALA offensive cascade',x:1090,y:600,buildings:'City_RearDepot2, CityFac3/6/7/8',badge:'BRANCH · CYCLE'});
+N({id:'pd_supportfac',label:'Destroy BDF SupportFac',type:'objective',side:'PALA',sys:'PALA offensive cascade',x:1360,y:430,buildings:'BDF_SuppFac1–3, factory_tall_2/5',badge:'CYCLE',
+   detail:'Part of the SupportFac ↔ TankFac ↔ AirbaseCity cyclic dependency: destroying one re-activates the others. Also re-opens AirFac1.'});
+N({id:'pd_tankfac',label:'Destroy BDF TankFac',type:'objective',side:'PALA',sys:'PALA offensive cascade',x:1360,y:600,buildings:'BDF_MBTFac1–4',badge:'CYCLE',
+   detail:'Part of the SupportFac ↔ TankFac ↔ AirbaseCity cycle.'});
+N({id:'pd_enrich',label:'Destroy BDF Enrichment',type:'objective',side:'PALA',sys:'PALA offensive cascade',x:1620,y:510});
+N({id:'pd_capmaris',label:'Capture: Maris Heliport',type:'capture',side:'PALA',sys:'PALA offensive cascade',x:560,y:760,
+   detail:'Co-triggered with Start_Destroy_BDF_LVFac2 (from HWY2). Capture-only.'});
+N({id:'pd_capnorthep',label:'Capture: Enrichment Plant North',type:'capture',side:'PALA',sys:'PALA offensive cascade',x:1360,y:760,
+   detail:'Co-triggered with the BDF Enrichment start (from Airbase North / City). Capture-only.'});
+E('start','pd_south'); E('start','pd_hwy2');
+E('pd_south','pd_lvf1'); E('pd_hwy2','pd_lvf2');
+E('pd_lvf1','pd_airfac1'); E('pd_lvf2','pd_airfac2');
+E('pd_airfac1','pd_abnorth'); E('pd_airfac2','pd_abcity');
+E('pd_abnorth','pd_supportfac'); E('pd_abnorth','pd_enrich');
+E('pd_abcity','pd_tankfac'); E('pd_abcity','pd_enrich');
+E('pd_tankfac','pd_supportfac','cycle'); E('pd_tankfac','pd_abcity','cycle');
+E('pd_supportfac','pd_tankfac','cycle'); E('pd_supportfac','pd_airfac1','cycle');
+E('pd_hwy2','pd_capmaris','capture');
+E('pd_abnorth','pd_capnorthep','capture'); E('pd_abcity','pd_capnorthep','capture');
+
+// --- Reinforcement system (8 chains) ---
+const chains=[
+ {k:'CE',side:'BDF',terr:'City',dir:'East'}, {k:'CW',side:'BDF',terr:'City',dir:'West'},
+ {k:'NE',side:'BDF',terr:'North',dir:'East'},{k:'NW',side:'BDF',terr:'North',dir:'West'},
+ {k:'DE',side:'PALA',terr:'Desert',dir:'East'},{k:'DW',side:'PALA',terr:'Desert',dir:'West'},
+ {k:'ME',side:'PALA',terr:'Mountain',dir:'East'},{k:'MW',side:'PALA',terr:'Mountain',dir:'West'},
+];
+const reTop=940, reRowH=86, reGap=40;
+chains.forEach((c,i)=>{
+  const grp=i<4?0:1;                       // BDF top group, PALA bottom group
+  const y=reTop + i*reRowH + grp*reGap;
+  const fac=c.side, ab=`${c.terr}→${c.dir}`;
+  const tk=TERRKO[c.terr], dk=DIRKO[c.dir], abk=`${tk}→${dk}`;
+  N({id:`rf_t_${c.k}`,label:`Threaten ${fac} ${c.terr} ${c.dir}`,lko:`${fac} ${tk} ${dk} 위협 감지`,type:'hidden',side:fac,sys:'Threat → Reinforcement',x:120,y,
+     detail:`Watcher: fires when a designated ${c.terr} building takes ≥50% damage. Immediately calls SendReinf.`,
+     dko:`감시기: 지정된 ${tk} 빌딩이 ≥50% 손상되면 발동, 즉시 SendReinf 호출.`});
+  N({id:`rf_s_${c.k}`,label:`SendReinf ${c.terr} ${c.dir}`,lko:`SendReinf ${tk} ${dk}`,type:'hidden',side:fac,sys:'Threat → Reinforcement',x:380,y,
+     detail:`Relay: starts the 15-minute reinforcement timer for the ${ab} front.`,
+     dko:`중계: ${abk} 전선 15분 증원 타이머 시작.`});
+  N({id:`rf_w_${c.k}`,label:`Wait 900s · Reinf ${ab}`,lko:`900초 대기 · 증원 ${abk}`,type:'wait',side:fac,sys:'Threat → Reinforcement',x:660,y,
+     detail:'15-minute delay. Can be cancelled by the matching Stop*Reinforcements if the rear depots are destroyed before it elapses.',
+     dko:'15분 지연. 타이머 경과 전 후방 데포를 파괴하면 대응 Stop*Reinforcements가 취소함.'});
+  N({id:`rf_c_${c.k}`,label:`Spawn Convoy ${ab} (15)`,lko:`호송대 스폰 ${abk} (15)`,type:'spawn',side:fac,sys:'Threat → Reinforcement',x:940,y,
+     detail:`Spawns 15 ground units toward the ${ab} front (e.g. ${fac}Conv${c.terr}${c.dir}1–15).`,
+     dko:`${abk} 방향으로 지상 유닛 15기 스폰 (예: ${fac}Conv${c.terr}${c.dir}1–15).`});
+  E(`rf_t_${c.k}`,`rf_s_${c.k}`); E(`rf_s_${c.k}`,`rf_w_${c.k}`); E(`rf_w_${c.k}`,`rf_c_${c.k}`,'wait');
+});
+
+// --- Depot → Stop system ---
+const depots=[
+ {terr:'City',side:'BDF',stops:['CE','CW'],y:reTop+0*reRowH},
+ {terr:'North',side:'BDF',stops:['NE','NW'],y:reTop+2*reRowH},
+ {terr:'Desert',side:'PALA',stops:['DE','DW'],y:reTop+4*reRowH+reGap},
+ {terr:'Mountain',side:'PALA',stops:['ME','MW'],y:reTop+6*reRowH+reGap},
+];
+depots.forEach(d=>{
+  const tk=TERRKO[d.terr];
+  N({id:`dp_${d.terr}`,label:`Destroy ${d.terr} Depots`,lko:`${tk} 데포 파괴`,type:'hidden',side:d.side,sys:'Depot → Stop',x:1230,y:d.y,
+     detail:`Fires when both ${d.terr}_RearDepot1 and 2 reach ≥50% damage.`,dko:`${d.terr}_RearDepot1, 2 둘 다 ≥50% 손상 시 발동.`,buildings:`${d.terr}_RearDepot1, ${d.terr}_RearDepot2`});
+  N({id:`st_${d.terr}`,label:`Stop ${d.terr} Reinforcements`,lko:`${tk} 증원 차단`,type:'stop',side:d.side,sys:'Depot → Stop',x:1470,y:d.y,
+     detail:`Permanently cancels the ${d.terr} reinforcement timers — the convoys never spawn.`,dko:`${tk} 증원 타이머 영구 취소 — 호송대가 스폰되지 않음.`});
+  E(`dp_${d.terr}`,`st_${d.terr}`);
+  d.stops.forEach(k=>E(`st_${d.terr}`,`rf_w_${k}`,'stop'));
+});
+
+// --- HVT → Carrier system (neutral) ---
+N({id:'hvt',label:'Damage HVT ≥50% (any 1 of 70+ buildings)',type:'hidden',side:'neutral',sys:'Carrier',x:1860,y:560,badge:'TRIGGER',
+   detail:'Single shared trigger. The first time ANY high-value building (CityFac/NorthFac/MtnFac/RearFac/IslandFac/factory/RearDepot/Enrichment) hits 50%, the naval countdown begins.'});
+N({id:'nv_delay',label:'Wait 50s · Naval msg delay',type:'wait',side:'neutral',sys:'Carrier',x:2120,y:560});
+N({id:'nv_msg',label:'MSG: Naval reinforcements · ETA 10 min',type:'message',side:'neutral',sys:'Carrier',x:2380,y:470});
+N({id:'nv_send',label:'Wait 600s (10 min)',type:'wait',side:'neutral',sys:'Carrier',x:2380,y:650});
+N({id:'nv_spawn',label:'SPAWN FLEETS · both carriers + 4 escorts',type:'spawn',side:'neutral',sys:'Carrier',x:2640,y:650,badge:'BOTH SIDES',
+   detail:'BDF_Carrier + PALA_Carrier + BDF_Esc1/2 + PALA_Esc1/2 spawn simultaneously. Total delay from HVT damage ≈ 50s + 600s = 650s (~10m50s).'});
+N({id:'nv_spawnmsg',label:'MSG: Fleets have arrived',type:'message',side:'neutral',sys:'Carrier',x:2640,y:470});
+E('hvt','nv_delay'); E('nv_delay','nv_msg'); E('nv_delay','nv_send'); E('nv_send','nv_spawn'); E('nv_send','nv_spawnmsg');
+
+// --- Victory cascades ---
+// PALA wins (destroy all BDF facilities + sink BDF carrier)
+N({id:'p_allfac',label:'Destroy ALL critical BDF facilities',type:'hidden',side:'PALA',sys:'Victory · PALA',x:2900,y:760,badge:'WIN REQ',
+   detail:'Requires CityFac1–9 + NorthFac1–9 all destroyed (spread across the PALA offensive cascade). Completion arms the BDF carrier sink.'});
+N({id:'p_startsink',label:'Start Sink BDF Carrier',type:'hidden',side:'PALA',sys:'Victory · PALA',x:3160,y:760});
+N({id:'p_sink',label:'Sink BDF Carrier',type:'objective',side:'PALA',sys:'Victory · PALA',x:3420,y:700,
+   detail:'Becomes a completable victory input only after all BDF facilities are gone (the carrier can be hit earlier, but the gate needs this objective marked complete).'});
+N({id:'p_sinknotif',label:'Sink BDF Carrier (notify)',type:'hidden',side:'PALA',sys:'Victory · PALA',x:3420,y:840});
+N({id:'p_sunkmsg',label:'MSG: BDF Fleet Carrier sunk',type:'message',side:'PALA',sys:'Victory · PALA',x:3680,y:840});
+N({id:'p_and',label:'PALA VICTORY CONDITIONS',type:'andgate',side:'PALA',sys:'Victory · PALA',x:3680,y:680,badge:'AND',
+   detail:'AND gate. Fires only when BOTH "all BDF facilities destroyed" AND "BDF carrier sunk" are complete.'});
+N({id:'p_victory',label:'PALA VICTORY · End Game',type:'victory',side:'PALA',sys:'Victory · PALA',x:3940,y:620});
+N({id:'p_vicmsg',label:'MSG: Enemy capitulated — victorious!',type:'message',side:'PALA',sys:'Victory · PALA',x:3940,y:740});
+E('p_allfac','p_startsink'); E('p_startsink','p_sink');
+E('p_allfac','p_and','and'); E('p_sink','p_and','and');
+E('p_and','p_victory'); E('p_and','p_vicmsg');
+E('p_sinknotif','p_sunkmsg');
+E('nv_spawn','p_sink','wait'); E('nv_spawn','p_sinknotif','wait');
+// cascade feeds the win requirement
+E('pd_airfac1','p_allfac','aggregate'); E('pd_airfac2','p_allfac','aggregate'); E('pd_abnorth','p_allfac','aggregate'); E('pd_abcity','p_allfac','aggregate');
+
+// BDF wins (mirror)
+N({id:'b_allfac',label:'Destroy ALL critical PALA facilities',type:'hidden',side:'BDF',sys:'Victory · BDF',x:2900,y:1080,badge:'WIN REQ',
+   detail:'Requires IslandFac1–3 + MtnFac1–8 + RearFac1–6 all destroyed. Completion arms the PALA carrier sink.'});
+N({id:'b_startsink',label:'Start Sink PALA Carrier',type:'hidden',side:'BDF',sys:'Victory · BDF',x:3160,y:1080});
+N({id:'b_sink',label:'Sink PALA Carrier',type:'objective',side:'BDF',sys:'Victory · BDF',x:3420,y:1080,
+   detail:'Completable victory input once all PALA facilities are destroyed.'});
+N({id:'b_sinknotif',label:'Sink PALA Carrier (notify)',type:'hidden',side:'BDF',sys:'Victory · BDF',x:3420,y:1220});
+N({id:'b_sunkmsg',label:'MSG: PALA Fleet Carrier sunk',type:'message',side:'BDF',sys:'Victory · BDF',x:3680,y:1220});
+N({id:'b_and',label:'BDF VICTORY CONDITIONS',type:'andgate',side:'BDF',sys:'Victory · BDF',x:3680,y:1080,badge:'AND',
+   detail:'AND gate. Fires only when BOTH "all PALA facilities destroyed" AND "PALA carrier sunk" are complete.'});
+N({id:'b_victory',label:'BDF VICTORY · End Game',type:'victory',side:'BDF',sys:'Victory · BDF',x:3940,y:1020});
+N({id:'b_vicmsg',label:'MSG: Enemy capitulated — victorious!',type:'message',side:'BDF',sys:'Victory · BDF',x:3940,y:1140});
+E('b_allfac','b_startsink'); E('b_startsink','b_sink');
+E('b_allfac','b_and','and'); E('b_sink','b_and','and');
+E('b_and','b_victory'); E('b_and','b_vicmsg');
+E('b_sinknotif','b_sunkmsg');
+E('nv_spawn','b_sink','wait'); E('nv_spawn','b_sinknotif','wait');
+E('bd_airfacrear','b_allfac','aggregate'); E('bd_abmtn','b_allfac','aggregate'); E('bd_airfacmtn','b_allfac','aggregate'); E('bd_airfacisland','b_allfac','aggregate');
+
+/* ---------- SIMPLIFIED GRAPH ---------- */
+const S_nodes=[], S_edges=[];
+function SN(o){S_nodes.push(o);} function SE(s,t,k){S_edges.push({s,t,k:k||'normal'});}
+SN({id:'s_start',label:'MISSION START',type:'start',side:'neutral',sys:'Start',x:900,y:40,
+    detail:'23 objects activate at once: visible objectives, both victory gates, and all hidden watchers.'});
+SN({id:'s_bdf',label:'BDF → destroy PALA chain · 12 objectives',type:'objective',side:'BDF',sys:'Offense',x:200,y:230,badge:'ENTRY ×1',
+    detail:'Linear cascade from HWY1 through the PALA airbases/factories. Single entry point (HWY1).'});
+SN({id:'s_pala',label:'PALA → destroy BDF chain · 11 objectives',type:'objective',side:'PALA',sys:'Offense',x:560,y:230,badge:'ENTRY ×2 · CYCLE',
+    detail:'Two entry points (South + HWY2). Contains the SupportFac ↔ TankFac ↔ AirbaseCity cyclic dependency.'});
+SN({id:'s_reinf',label:'Threat detection ×8 → reinforcements',type:'hidden',side:'neutral',sys:'Reinforcement',x:940,y:230,
+    detail:'8 territory watchers (BDF City/North, PALA Desert/Mountain). Each: building ≥50% damage → 15-min timer → 15-unit convoy.'});
+SN({id:'s_depot',label:'Rear depot kill → stop reinforcements ×4',type:'stop',side:'neutral',sys:'Reinforcement',x:1280,y:230,
+    detail:'Destroying both rear depots of a territory permanently cancels that territory\u2019s convoy timers.'});
+SN({id:'s_hvt',label:'Any HVT 50% damage → carrier countdown',type:'hidden',side:'neutral',sys:'Carrier',x:1620,y:230,badge:'TRIGGER',
+    detail:'One shared trigger (70+ eligible buildings). Starts the naval reinforcement timeline.'});
+SN({id:'s_allfac_b',label:'All BDF facilities destroyed',type:'hidden',side:'BDF',sys:'Win req',x:200,y:430,badge:'WIN REQ'});
+SN({id:'s_allfac_p',label:'All PALA facilities destroyed',type:'hidden',side:'PALA',sys:'Win req',x:560,y:430,badge:'WIN REQ'});
+SN({id:'s_convoy',label:'Convoy spawn (15 units) ×8',type:'spawn',side:'neutral',sys:'Reinforcement',x:1100,y:430,
+    detail:'Map-control reinforcements — not a direct win condition.'});
+SN({id:'s_carrier',label:'Both carriers + 4 escorts spawn (~10m50s)',type:'spawn',side:'neutral',sys:'Carrier',x:1620,y:430,badge:'BOTH SIDES'});
+SN({id:'s_sink_b',label:'Sink BDF carrier',type:'objective',side:'PALA',sys:'Win req',x:1200,y:620});
+SN({id:'s_sink_p',label:'Sink PALA carrier',type:'objective',side:'BDF',sys:'Win req',x:1640,y:620});
+SN({id:'s_pala_and',label:'PALA VICTORY (AND)',type:'andgate',side:'PALA',sys:'Victory',x:620,y:640,badge:'AND',
+    detail:'All BDF facilities destroyed AND BDF carrier sunk.'});
+SN({id:'s_bdf_and',label:'BDF VICTORY (AND)',type:'andgate',side:'BDF',sys:'Victory',x:230,y:640,badge:'AND',
+    detail:'All PALA facilities destroyed AND PALA carrier sunk.'});
+SN({id:'s_end',label:'GAME END',type:'victory',side:'neutral',sys:'Victory',x:430,y:840,
+    detail:'If neither side meets its full win condition within 1h30m (NOCS V), the higher-scoring team wins.'});
+SE('s_start','s_bdf'); SE('s_start','s_pala'); SE('s_start','s_reinf'); SE('s_start','s_depot'); SE('s_start','s_hvt');
+SE('s_bdf','s_allfac_b','aggregate'); SE('s_pala','s_allfac_p','aggregate');
+SE('s_reinf','s_convoy'); SE('s_depot','s_convoy','stop'); SE('s_hvt','s_carrier');
+SE('s_carrier','s_sink_b','wait'); SE('s_carrier','s_sink_p','wait');
+SE('s_allfac_p','s_pala_and','and'); SE('s_sink_b','s_pala_and','and');
+SE('s_allfac_b','s_bdf_and','and'); SE('s_sink_p','s_bdf_and','and');
+SE('s_pala_and','s_end'); SE('s_bdf_and','s_end');
+
+/* ---------- RENDER ENGINE ---------- */
+const SVG='http://www.w3.org/2000/svg';
+const stage=document.getElementById('stage');
+const NS=(n)=>document.createElementNS(SVG,n);
+let G;                                  // pan/zoom group
+let view={s:1,x:0,y:0};
+let state={tab:'full',side:'all',sel:null,lang:'en'};
+let nodeMap={}, dom={};
+
+function L(n){ if(state.lang==='ko') return n.lko || (KO[n.id]&&KO[n.id].l) || n.label; return n.label; }
+function D(n){ if(state.lang==='ko') return n.dko || (KO[n.id]&&KO[n.id].d) || n.detail || ''; return n.detail||''; }
+function B(n){ if(!n.badge) return ''; if(state.lang==='ko') return n.bko || (KO[n.id]&&KO[n.id].b) || n.badge; return n.badge; }
+function typeName(n){ return state.lang==='ko' ? (TYPENAME_KO[n.type]||n.type) : (TYPENAME[n.type]||n.type); }
+function sysName(n){ return state.lang==='ko' ? (SYSKO[n.sys]||n.sys) : n.sys; }
+
+function dataFor(tab){ return tab==='full'?{nodes:F_nodes,edges:F_edges}:{nodes:S_nodes,edges:S_edges}; }
+
+// measure label -> lines/size
+function layout(n){
+  const max=22, words=String(L(n)).split(' '), lines=[]; let cur='';
+  for(const w of words){ if((cur+' '+w).trim().length>max){ if(cur)lines.push(cur); cur=w; } else cur=(cur+' '+w).trim(); }
+  if(cur)lines.push(cur);
+  n._lines=lines;
+  const longest=lines.reduce((a,b)=>Math.max(a,b.length),0);
+  n.w=Math.max(140,Math.min(230,longest*7.0+26));
+  n.h=lines.length*15+ (n.badge?16:0) +18;
+}
+
+function homeReset(){ const {nodes}=dataFor(state.tab); nodes.forEach(n=>{ n.x=n._hx; n.y=n._hy; }); draw(); }
+
+function visible(n){ return state.side==='all' || n.side==='neutral' || n.side===state.side; }
+
+function nodeColor(n){ return COLORS[n.type]||'#888'; }
+
+function draw(){
+  const {nodes,edges}=dataFor(state.tab);
+  nodes.forEach(layout);
+  nodeMap={}; nodes.forEach(n=>nodeMap[n.id]=n);
+  stage.innerHTML='';
+  // defs: arrow markers
+  const defs=NS('defs');
+  [['arr','#7e8c9c'],['arrc','#f5a623'],['arrs','#9013fe'],['arra','#bd10e0'],['arrg','#4a90e2']].forEach(([id,c])=>{
+    const m=NS('marker'); m.setAttribute('id',id); m.setAttribute('viewBox','0 0 10 10');
+    m.setAttribute('refX','9'); m.setAttribute('refY','5'); m.setAttribute('markerWidth','7');
+    m.setAttribute('markerHeight','7'); m.setAttribute('orient','auto-start-reverse');
+    const p=NS('path'); p.setAttribute('d','M0,0 L10,5 L0,10 z'); p.setAttribute('fill',c); m.appendChild(p); defs.appendChild(m);
+  });
+  stage.appendChild(defs);
+  G=NS('g'); stage.appendChild(G);
+
+  const eLayer=NS('g'), nLayer=NS('g'); G.appendChild(eLayer); G.appendChild(nLayer);
+
+  // edges
+  edges.forEach(e=>{
+    const a=nodeMap[e.s], b=nodeMap[e.t]; if(!a||!b) return;
+    if(!visible(a)||!visible(b)) return;
+    const path=NS('path');
+    const x1=a.x+a.w/2, y1=a.y, x2=b.x-b.w/2, y2=b.y;
+    const dx=Math.max(40,Math.abs(x2-x1)*0.45);
+    const d=`M ${a.x+a.w/2} ${a.y} C ${x1+dx} ${y1}, ${x2-dx} ${y2}, ${b.x-b.w/2} ${b.y}`;
+    path.setAttribute('d',d); path.setAttribute('fill','none');
+    let stroke='#7e8c9c', mk='arr', dash='', w=1.6, op=.85;
+    if(e.k==='capture'){stroke='#f5a623';mk='arrc';dash='5 4';}
+    else if(e.k==='cycle'){stroke='#bd10e0';mk='arra';w=2.2;op=1;}
+    else if(e.k==='stop'){stroke='#9013fe';mk='arrs';dash='2 5';}
+    else if(e.k==='and'){stroke='#bd10e0';mk='arra';w=2;}
+    else if(e.k==='aggregate'){stroke='#4a90e2';mk='arrg';dash='1 6';op=.55;}
+    else if(e.k==='wait'){stroke='#9aa6b2';dash='6 4';}
+    path.setAttribute('stroke',stroke); path.setAttribute('stroke-width',w);
+    path.setAttribute('opacity',op); if(dash)path.setAttribute('stroke-dasharray',dash);
+    path.setAttribute('marker-end',`url(#${mk})`);
+    eLayer.appendChild(path);
+  });
+
+  // nodes
+  dom={};
+  nodes.forEach(n=>{
+    if(!visible(n)) return;
+    const c=nodeColor(n);
+    const g=NS('g'); g.setAttribute('transform',`translate(${n.x-n.w/2},${n.y-n.h/2})`);
+    g.style.cursor='pointer';
+    const r=NS('rect'); r.setAttribute('width',n.w); r.setAttribute('height',n.h);
+    r.setAttribute('rx',8); r.setAttribute('fill',hexA(c,n.type==='start'?0.16:0.14));
+    r.setAttribute('stroke',c); r.setAttribute('stroke-width', state.sel===n.id?3:1.8);
+    if(n.type==='wait') r.setAttribute('stroke-dasharray','6 4');
+    if(state.sel===n.id) r.setAttribute('filter','');
+    g.appendChild(r);
+    // accent bar
+    const bar=NS('rect'); bar.setAttribute('width',4); bar.setAttribute('height',n.h);
+    bar.setAttribute('rx',2); bar.setAttribute('fill',c); g.appendChild(bar);
+    // text
+    const padY=n.badge?20:12;
+    n._lines.forEach((ln,i)=>{
+      const t=NS('text'); t.setAttribute('x',12); t.setAttribute('y',padY+i*15);
+      t.setAttribute('fill','#e7edf3'); t.setAttribute('font-size','11.5');
+      t.setAttribute('font-family','var(--mono)'); t.textContent=ln; g.appendChild(t);
+    });
+    if(n.badge){
+      const by=n.h-7;
+      const t=NS('text'); t.setAttribute('x',12); t.setAttribute('y',by);
+      t.setAttribute('fill',c); t.setAttribute('font-size','8.5');
+      t.setAttribute('letter-spacing','1.5'); t.textContent=B(n);
+      g.appendChild(t);
+    }
+    attachDrag(g,n);
+    nLayer.appendChild(g); dom[n.id]=g;
+  });
+  applyView();
+  const tabName = state.lang==='ko' ? (state.tab==='full'?'전체':'간략') : state.tab.toUpperCase();
+  const word = state.lang==='ko' ? '노드' : 'nodes';
+  document.getElementById('counter').textContent =
+    `${nodes.filter(visible).length} ${word} · ${tabName}`;
+}
+
+function hexA(hex,a){const h=hex.replace('#','');const r=parseInt(h.substr(0,2),16),g=parseInt(h.substr(2,2),16),b=parseInt(h.substr(4,2),16);return `rgba(${r},${g},${b},${a})`;}
+
+function applyView(){ if(G) G.setAttribute('transform',`translate(${view.x},${view.y}) scale(${view.s})`); }
+
+/* ---------- interaction: pan / zoom ---------- */
+let panning=false,pStart=null;
+stage.addEventListener('mousedown',e=>{
+  if(e.target.closest('g[data-node]')) return;
+  panning=true; stage.classList.add('grabbing'); pStart={x:e.clientX-view.x,y:e.clientY-view.y};
+});
+window.addEventListener('mousemove',e=>{
+  if(panning){ view.x=e.clientX-pStart.x; view.y=e.clientY-pStart.y; applyView(); }
+});
+window.addEventListener('mouseup',()=>{panning=false;stage.classList.remove('grabbing');});
+stage.addEventListener('wheel',e=>{
+  e.preventDefault();
+  const rect=stage.getBoundingClientRect(); const mx=e.clientX-rect.left, my=e.clientY-rect.top;
+  const f=e.deltaY<0?1.12:1/1.12; const ns=Math.max(0.18,Math.min(2.6,view.s*f));
+  view.x=mx-(mx-view.x)*(ns/view.s); view.y=my-(my-view.y)*(ns/view.s); view.s=ns; applyView();
+},{passive:false});
+
+/* node drag + click */
+function attachDrag(g,n){
+  g.setAttribute('data-node',n.id);
+  let moved=false,start=null,orig=null;
+  g.addEventListener('mousedown',e=>{
+    e.stopPropagation(); moved=false; start={x:e.clientX,y:e.clientY}; orig={x:n.x,y:n.y};
+    const move=ev=>{
+      const dx=(ev.clientX-start.x)/view.s, dy=(ev.clientY-start.y)/view.s;
+      if(Math.abs(ev.clientX-start.x)+Math.abs(ev.clientY-start.y)>4) moved=true;
+      n.x=orig.x+dx; n.y=orig.y+dy; draw();
+    };
+    const up=ev=>{
+      window.removeEventListener('mousemove',move); window.removeEventListener('mouseup',up);
+      if(!moved) select(n.id);
+    };
+    window.addEventListener('mousemove',move); window.addEventListener('mouseup',up);
+  });
+}
+
+/* ---------- side panel ---------- */
+const panel=document.getElementById('panel');
+function select(id){
+  state.sel=id; draw();
+  const n=nodeMap[id]; if(!n)return;
+  const ko=state.lang==='ko', c=nodeColor(n);
+  const tag=document.getElementById('p-tag');
+  tag.textContent=typeName(n); tag.style.color=c;
+  document.getElementById('p-title').textContent=L(n);
+  let html='';
+  const sideTxt = n.side==='neutral' ? (ko?'중립 / 공유':'Neutral / shared') : n.side;
+  html+=`<div class="k">${ko?'진영':'Faction'}</div><span class="chip">${sideTxt}</span>`;
+  html+=`<div class="k">${ko?'시스템':'System'}</div><span class="chip">${sysName(n)}</span>`;
+  const bd=B(n); if(bd) html+=`<span class="chip" style="color:${c};border-color:${c}">${bd}</span>`;
+  const dt=D(n); if(dt){ html+=`<div class="k">${ko?'동작':'Behaviour'}</div><div>${dt}</div>`; }
+  const {edges}=dataFor(state.tab);
+  const outs=edges.filter(e=>e.s===id), ins=edges.filter(e=>e.t===id);
+  if(outs.length){ html+=`<div class="k">${ko?'트리거하는 것':'Triggers'}</div><ul>`+outs.map(e=>`<li>${edgeVerb(e.k)} <code>${labelOf(e.t)}</code></li>`).join('')+`</ul>`; }
+  if(ins.length){ html+=`<div class="k">${ko?'발동 출처':'Triggered by'}</div><ul>`+ins.map(e=>`<li><code>${labelOf(e.s)}</code></li>`).join('')+`</ul>`; }
+  if(n.buildings){ html+=`<div class="k">${ko?'빌딩':'Buildings'}</div><div>${n.buildings}</div>`; }
+  document.getElementById('p-body').innerHTML=html;
+  panel.classList.add('open');
+}
+function labelOf(id){ const n=(state.tab==='full'?F_nodes:S_nodes).find(x=>x.id===id); return n?L(n):id; }
+function edgeVerb(k){
+  if(state.lang==='ko') return {capture:'동시 시작',stop:'취소',and:'AND 입력 →',aggregate:'기여',cycle:'재활성화'}[k]||'시작';
+  return {capture:'co-starts',stop:'cancels',and:'feeds AND →',aggregate:'contributes to',cycle:'re-activates'}[k]||'starts';
+}
+document.getElementById('p-close').onclick=()=>{ panel.classList.remove('open'); state.sel=null; draw(); };
+
+/* ---------- controls ---------- */
+document.querySelectorAll('#tabs button').forEach(b=>b.onclick=()=>{
+  document.querySelectorAll('#tabs button').forEach(x=>x.classList.remove('on')); b.classList.add('on');
+  state.tab=b.dataset.tab; state.sel=null; panel.classList.remove('open'); ensureHome(); draw(); fit();
+});
+document.querySelectorAll('#filter button').forEach(b=>b.onclick=()=>{
+  document.querySelectorAll('#filter button').forEach(x=>x.classList.remove('on')); b.classList.add('on');
+  state.side=b.dataset.side; draw();
+});
+document.querySelectorAll('#lang button').forEach(b=>b.onclick=()=>{
+  document.querySelectorAll('#lang button').forEach(x=>x.classList.remove('on')); b.classList.add('on');
+  state.lang=b.dataset.lang; applyLang();
+});
+function applyLang(){
+  const ko=state.lang==='ko';
+  document.querySelector('#tabs [data-tab=full]').textContent   = ko?'전체':'Full';
+  document.querySelector('#tabs [data-tab=simple]').textContent = ko?'간략':'Simplified';
+  document.querySelector('#filter [data-side=all]').textContent = ko?'양측':'Both';
+  document.getElementById('lbl-faction').textContent = ko?'진영':'Faction';
+  document.getElementById('lbl-lang').textContent    = ko?'언어':'Lang';
+  document.getElementById('fit').textContent   = ko?'맞춤':'Fit';
+  document.getElementById('reset').textContent = ko?'배치 초기화':'Reset layout';
+  document.getElementById('hint').textContent = ko
+    ? '노드 드래그 · 스크롤 줌 · 빈 공간 드래그로 이동 · 노드 클릭 시 상세'
+    : 'Drag nodes · scroll to zoom · drag empty space to pan · click a node for detail';
+  document.getElementById('lg-title').textContent = ko?'노드 종류':'Node types';
+  const en=['Visible objective','Capture option','Hidden watcher','Wait / delay','Spawn event','Message','Stop / interrupt','AND gate','Victory / end'];
+  const kk=['가시 오브젝티브','점령 옵션','숨겨진 감시기','대기 / 지연','스폰 이벤트','메시지','차단 / 중단','AND 게이트','승리 / 종료'];
+  document.querySelectorAll('.legend .lt').forEach((el,i)=>{ el.textContent = ko?kk[i]:en[i]; });
+  document.getElementById('lg-note').textContent = ko
+    ? '진영 = 이 노드가 어느 쪽 승리를 돕는가(공격) 또는 어느 영토를 방어하는가. neutral(항모/HVT)은 모든 뷰에 표시.'
+    : "Faction = which side's win this node serves (offense) or whose territory it defends. Neutral (carrier / HVT) shows in all views.";
+  draw();
+  if(state.sel) select(state.sel);
+}
+document.getElementById('reset').onclick=()=>{ homeReset(); fit(); };
+document.getElementById('fit').onclick=fit;
+
+function ensureHome(){ const {nodes}=dataFor(state.tab); nodes.forEach(n=>{ if(n._hx===undefined){n._hx=n.x;n._hy=n.y;} }); }
+
+function fit(){
+  const ns=dataFor(state.tab).nodes.filter(visible); if(!ns.length)return;
+  ns.forEach(layout);
+  let minX=1e9,minY=1e9,maxX=-1e9,maxY=-1e9;
+  ns.forEach(n=>{ minX=Math.min(minX,n.x-n.w/2); maxX=Math.max(maxX,n.x+n.w/2);
+                  minY=Math.min(minY,n.y-n.h/2); maxY=Math.max(maxY,n.y+n.h/2); });
+  const pad=60, w=maxX-minX+pad*2, h=maxY-minY+pad*2;
+  const vw=stage.clientWidth, vh=stage.clientHeight;
+  const s=Math.min(vw/w, vh/h, 1.4);
+  view.s=s; view.x=(vw-w*s)/2 - (minX-pad)*s; view.y=(vh-h*s)/2 - (minY-pad)*s; applyView();
+}
+
+// init
+F_nodes.forEach(n=>{n._hx=n.x;n._hy=n.y;}); S_nodes.forEach(n=>{n._hx=n.x;n._hy=n.y;});
+draw(); fit();
+setTimeout(()=>{ const h=document.getElementById('hint'); h.style.opacity='0'; },6000);
+window.addEventListener('resize',()=>{ /* keep current transform */ });
+</script>
